@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>OD</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+        <script src="https://www.npmjs.com/package/chartjs-plugin-zoom/file/503c709802be285c676afe0369bf5f72066d0b0c23929188c3158f35c0327a9c"></script>
+        <style>
+            html,
+            body {
+                padding: 0;
+                margin: 0;
+            }
+        </style>
+    </head>
+    <body style="max-height: 100vh; height: 100vh; display: flex; flex-direction: column">
+        <div id="header" style="flex: 0; padding: 10px">
+            <div id="btnSelect" style="background-color: brown; color: white; padding: 5px; border-radius: 5px; cursor: pointer; max-width: fit-content">Select device</div>
+        </div>
+        <div style="flex: 1">
+            <canvas id="myChart" style="max-height: 100%"></canvas>
+        </div>
+        <script type="text/javascript">
+            if (!("serial" in navigator)) {
+                alert("Your browser does not support serial!");
+                location.reload();
+            }
+
+            const ctx = document.getElementById("myChart");
+
+            const data = [];
+            const data2 = [];
+            let prev = 100;
+            let prev2 = 80;
+            let j = 0;
+
+            // for (let i = 0; i < 1000; i++) {
+            //   prev += 5 - Math.random() * 10;
+            //   data.push({ x: i, y: prev });
+            //   prev2 += 5 - Math.random() * 10;
+            //   data2.push({ x: i, y: prev2 });
+            //   j++;
+            // }
+
+            const chart = new Chart(ctx, {
+                type: "line",
+                data: {
+                    // labels: ["Raw", "OD"],
+                    datasets: [
+                        {
+                            // borderColor: CHART_COLORS.red,
+                            borderWidth: 1,
+                            radius: 0,
+                            data: data,
+                            label: "Raw",
+                        },
+                        {
+                            // borderColor: CHART_COLORS.blue,
+                            borderWidth: 1,
+                            radius: 0,
+                            data: data2,
+                            label: "OD",
+                        },
+                    ],
+                },
+                options: {
+                    animation: false,
+                    interaction: {
+                        intersect: false,
+                    },
+                    scales: {
+                        x: {
+                            type: "linear",
+                            ticks: {
+                                minRotation: 0,
+                                maxRotation: 0,
+                            },
+                        },
+                        y: {
+                            ticks: {
+                                minRotation: 0,
+                                maxRotation: 0,
+                            },
+                        },
+                    },
+                    plugins: {
+                        legend: false,
+                        tooltip: false,
+                        zoom: {
+                            zoom: {
+                                wheel: {
+                                    enabled: true,
+                                },
+                                pinch: {
+                                    enabled: true,
+                                },
+                                mode: "xy",
+                            },
+                            pan: {
+                                enabled: true,
+                                onPanStart: ({ chart }) => {
+                                    // chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+                                },
+                                onPanComplete: ({ chart }) => {
+                                    // chart.config.options.plugins.tooltip.enabled = true;
+                                    // chart.update();
+                                },
+                            },
+                        },
+                    },
+                    options: {
+                        spanGaps: true, // enable for all datasets
+                    },
+                },
+            });
+
+            document.body.onmousemove = (e) => {
+                // console.log(e);
+
+                // console.log(chart.config.options.plugins);
+
+                if (e.clientY > window.innerHeight - 40) {
+                    document.body.style.cursor = "ew-resize";
+                    chart.config.options.plugins.zoom.zoom.mode = "x";
+                } else if (e.clientX < 40) {
+                    document.body.style.cursor = "ns-resize";
+                    chart.config.options.plugins.zoom.zoom.mode = "y";
+                } else {
+                    document.body.style.cursor = "";
+                    chart.config.options.plugins.zoom.zoom.mode = "xy";
+                }
+            };
+
+            navigator.serial.getPorts().then(async (ports) => {
+                if (ports.length > 0) {
+                    const port = ports[0];
+
+                    port.onconnect = () => {
+                        // port.setSignals({ dataTerminalReady: true, requestToSend: false });
+                        console.log("hi");
+                    };
+
+                    await port.open({ baudRate: 921000 });
+                    await port.setSignals({ dataTerminalReady: true, requestToSend: false });
+
+                    //   const reader = port.readable.getReader();
+
+                    while (port.readable) {
+                        const textDecoder = new TextDecoderStream();
+                        const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+                        const reader = textDecoder.readable.getReader();
+
+                        // let dataIn = "";
+                        let state = 0;
+                        let currentNumString = "";
+
+                        try {
+                            while (true) {
+                                const { value, done } = await reader.read();
+                                if (done) {
+                                    // Allow the serial port to be closed later.
+                                    reader.releaseLock();
+                                    break;
+                                }
+                                if (value) {
+                                    // dataIn += value;
+                                    // console.log(dataIn);
+
+                                    for (const c of value) {
+                                        switch (state) {
+                                            case 0:
+                                                if (c === "$") {
+                                                    state = 1;
+                                                }
+                                                break;
+                                            case 1:
+                                                if (c !== " ") {
+                                                    currentNumString += c;
+                                                    // console.log(currentNumString);
+                                                } else {
+                                                    data.push({ x: j, y: Number.parseFloat(currentNumString) });
+                                                    currentNumString = "";
+                                                    state = 2;
+                                                }
+                                                break;
+                                            case 2:
+                                                if (c !== ";") {
+                                                    currentNumString += c;
+                                                } else {
+                                                    data2.push({ x: j, y: Number.parseFloat(currentNumString) });
+                                                    currentNumString = "";
+                                                    state = 0;
+                                                    chart.update();
+                                                    j++;
+                                                }
+                                                break;
+                                            default:
+                                                throw Error("Invalid state: " + state);
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (error) {
+                            console.error(error);
+                        }
+                    }
+                }
+            });
+
+            document.getElementById("btnSelect").addEventListener("click", async () => {
+                // Prompt user to select any serial port.
+                const port = await navigator.serial.requestPort();
+
+                await port.open({ baudRate: 921000 });
+                await port.setSignals({ dataTerminalReady: true, requestToSend: false });
+                await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+
+                //   const reader = port.readable.getReader();
+
+                while (port.readable) {
+                    const textDecoder = new TextDecoderStream();
+                    const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+                    const reader = textDecoder.readable.getReader();
+
+                    // let dataIn = "";
+                    let state = 0;
+                    let currentNumString = "";
+
+                    try {
+                        while (true) {
+                            const { value, done } = await reader.read();
+                            if (done) {
+                                // Allow the serial port to be closed later.
+                                reader.releaseLock();
+                                break;
+                            }
+                            if (value) {
+                                // dataIn += value;
+                                // console.log(dataIn);
+
+                                for (const c of value) {
+                                    switch (state) {
+                                        case 0:
+                                            if (c === "$") {
+                                                state = 1;
+                                            }
+                                            break;
+                                        case 1:
+                                            if (c !== " ") {
+                                                currentNumString += c;
+                                                // console.log(currentNumString);
+                                            } else {
+                                                data.push({ x: j, y: Number.parseFloat(currentNumString) });
+                                                currentNumString = "";
+                                                state = 2;
+                                            }
+                                            break;
+                                        case 2:
+                                            if (c !== ";") {
+                                                currentNumString += c;
+                                            } else {
+                                                data2.push({ x: j, y: Number.parseFloat(currentNumString) });
+                                                currentNumString = "";
+                                                state = 0;
+                                                chart.update();
+                                                j++;
+                                            }
+                                            break;
+                                        default:
+                                            throw Error("Invalid state: " + state);
+                                    }
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error(error);
+                    }
+                }
+            });
+        </script>
+    </body>
+</html>
