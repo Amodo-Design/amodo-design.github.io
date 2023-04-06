@@ -10,12 +10,90 @@
             body {
                 padding: 0;
                 margin: 0;
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+                user-select: none;
+            }
+
+            .btn {
+                background-color: white;
+                color: #555;
+                padding: 8px;
+                padding-left: 12px;
+                padding-right: 12px;
+                border-radius: 999px;
+                cursor: pointer;
+                max-width: fit-content;
+                font-weight: bold;
+                text-transform: capitalize;
+                transition: all 0.2s ease-in-out;
+                border: 1px solid #ddd;
+            }
+            .btn:hover {
+                background-color: #eee;
+            }
+
+            .active {
+                background-color: #32de84;
+                color: white;
+            }
+            .active:hover {
+                background-color: #1cac78 !important;
+            }
+
+            .dropdown {
+                align-self: flex-end;
+                text-align: end;
+                position: absolute;
+                margin-top: 4px;
+                border-radius: 10px;
+                border: 1px solid #ddd;
+                /* padding: 6px 12px 6px 12px; */
+                /* margin-left: auto; */
+                overflow: hidden;
+                right: 0;
+                background-color: white;
+                font-weight: bold;
+                text-transform: capitalize;
+                color: #555;
+                cursor: pointer;
+            }
+
+            .dropdownEntry {
+                padding: 6px 12px 6px 12px;
+            }
+            .dropdownEntry:hover {
+                background-color: #eee;
             }
         </style>
     </head>
     <body style="max-height: 100vh; height: 100vh; display: flex; flex-direction: column">
-        <div id="header" style="flex: 0; padding: 10px">
-            <div id="btnSelect" style="background-color: brown; color: white; padding: 5px; border-radius: 5px; cursor: pointer; max-width: fit-content">Select device</div>
+        <div id="header" style="flex: 0; padding: 10px; display: flex; flex-direction: row; gap: 5px">
+            <div id="btnSelect" class="btn">Select device</div>
+            <div id="btnExport" class="btn">Export data to CSV</div>
+            <div id="btnClear" class="btn">Clear data</div>
+            <div id="btnZero" class="btn">Zero sensor</div>
+            <div id="ddGain" style="position: relative">
+                <div class="btn">
+                    <p id="ddGainValue" style="display: inline"></p>
+                    gain
+                    <p style="display: inline; padding-left: 5px">&#9660;</p>
+                </div>
+                <div class="dropdown" style="display: none">
+                    <div class="dropdownEntry" gain="1">1X</div>
+                    <div class="dropdownEntry" gain="4">4X</div>
+                    <div class="dropdownEntry" gain="16">16X</div>
+                    <div class="dropdownEntry" gain="64">64X</div>
+                    <div class="dropdownEntry" gain="128">128X</div>
+                </div>
+            </div>
+            <div id="ddIntTime" style="position: relative">
+                <div class="btn">
+                    <p id="ddIntTimeValue" style="display: inline"></p>
+                    integration time
+                    <p style="display: inline; padding-left: 5px">&#9660;</p>
+                </div>
+                <div class="dropdown" style="display: none"></div>
+            </div>
         </div>
         <div style="flex: 1">
             <canvas id="myChart" style="max-height: 100%"></canvas>
@@ -26,22 +104,97 @@
                 location.reload();
             }
 
-            const ctx = document.getElementById("myChart");
-
-            const data = [];
-            const data2 = [];
-            let prev = 100;
-            let prev2 = 80;
+            let data = [];
+            let data2 = [];
             let j = 0;
+            let connectedPort = null;
+            let currentReader = null;
+            let currentWriter = null;
+            const btnConnect = document.getElementById("btnSelect");
 
-            // for (let i = 0; i < 1000; i++) {
-            //   prev += 5 - Math.random() * 10;
-            //   data.push({ x: i, y: prev });
-            //   prev2 += 5 - Math.random() * 10;
-            //   data2.push({ x: i, y: prev2 });
-            //   j++;
+            function setGain(gain) {
+                document.getElementById("ddGainValue").innerText = gain + "X";
+                const mapping = { 1: "0", 4: "1", 16: "2", 64: "3", 128: "4" };
+                if (currentWriter) currentWriter.write(mapping[gain]);
+            }
+
+            function setIntegrationTime(numTicks) {
+                document.getElementById("ddIntTimeValue").innerText = (((numTicks * 25 + 5) * 2.78) >> 0) + "ms";
+                if (currentWriter) currentWriter.write(String.fromCharCode("a".charCodeAt(0) + numTicks));
+            }
+
+            // for (let a = 0; a < 30000; a++) {
+            //     data.push({ x: a, y: Math.random() });
+            //     data2.push({ x: a, y: Math.random() });
+            //     j++;
             // }
 
+            document.getElementById("btnZero").addEventListener("click", async () => {
+                await currentWriter.write("z");
+            });
+
+            document.getElementById("btnExport").addEventListener("click", async () => {
+                const newHandle = await window.showSaveFilePicker({
+                    suggestedName: "data.csv",
+                    types: [
+                        {
+                            description: "CSV (Comma delimited)",
+                            accept: { "text/csv": [".csv"] },
+                        },
+                    ],
+                });
+
+                // create a FileSystemWritableFileStream to write to
+                const writableStream = await newHandle.createWritable();
+                await writableStream.write("Raw,OD\n");
+
+                window.onbeforeunload = () => {
+                    writableStream.close();
+                };
+
+                let streamString = "";
+                for (let i = 0; i < data.length; i++) {
+                    streamString += data[i].y + "," + data2[i].y + "\n";
+                }
+                await writableStream.write(streamString);
+
+                console.log("Write finished");
+                await writableStream.close();
+
+                window.onbeforeunload = null;
+            });
+
+            document.querySelector("#ddGain .btn").addEventListener("click", () => {
+                const dd = document.querySelector("#ddGain .dropdown");
+                dd.style.display = dd.style.display == "" ? "none" : "";
+            });
+            document.querySelectorAll("#ddGain .dropdownEntry").forEach((e) => {
+                e.addEventListener("click", () => {
+                    document.querySelector("#ddGain .dropdown").style.display = "none";
+                    setGain(e.getAttribute("gain"));
+                });
+            });
+
+            // Create integration time dropdown:
+            for (let i = 0; i <= 10; i++) {
+                const entry = document.createElement("div");
+                entry.classList.add("dropdownEntry");
+                entry.setAttribute("time", i);
+                entry.innerText = (((i * 25 + 5) * 2.78) >> 0) + "ms";
+                document.querySelector("#ddIntTime .dropdown").append(entry);
+            }
+            document.querySelector("#ddIntTime .btn").addEventListener("click", () => {
+                const dd = document.querySelector("#ddIntTime .dropdown");
+                dd.style.display = dd.style.display == "" ? "none" : "";
+            });
+            document.querySelectorAll("#ddIntTime .dropdownEntry").forEach((e) => {
+                e.addEventListener("click", () => {
+                    document.querySelector("#ddIntTime .dropdown").style.display = "none";
+                    setIntegrationTime(Number.parseInt(e.getAttribute("time")));
+                });
+            });
+
+            const ctx = document.getElementById("myChart");
             const chart = new Chart(ctx, {
                 type: "line",
                 data: {
@@ -68,24 +221,30 @@
                     interaction: {
                         intersect: false,
                     },
+                    responsive: true,
+                    maintainAspectRatio: false,
                     scales: {
                         x: {
                             type: "linear",
                             ticks: {
                                 minRotation: 0,
                                 maxRotation: 0,
+                                precision: 0,
+                                includeBounds: false,
                             },
                         },
                         y: {
                             ticks: {
+                                precision: 0,
                                 minRotation: 0,
                                 maxRotation: 0,
+                                includeBounds: false,
                             },
                         },
                     },
                     plugins: {
-                        legend: false,
-                        tooltip: false,
+                        // legend: false,
+                        // tooltip: false,
                         zoom: {
                             zoom: {
                                 wheel: {
@@ -99,19 +258,20 @@
                             pan: {
                                 enabled: true,
                                 onPanStart: ({ chart }) => {
-                                    // chart.tooltip.setActiveElements([], { x: 0, y: 0 });
-                                },
-                                onPanComplete: ({ chart }) => {
-                                    // chart.config.options.plugins.tooltip.enabled = true;
-                                    // chart.update();
+                                    chart.tooltip.setActiveElements([], { x: 0, y: 0 });
                                 },
                             },
                         },
                     },
-                    options: {
-                        spanGaps: true, // enable for all datasets
-                    },
+                    spanGaps: true,
                 },
+            });
+
+            document.getElementById("btnClear").addEventListener("click", () => {
+                data.length = 0;
+                data2.length = 0;
+                j = 0;
+                chart.update();
             });
 
             document.body.onmousemove = (e) => {
@@ -131,98 +291,46 @@
                 }
             };
 
-            navigator.serial.getPorts().then(async (ports) => {
-                if (ports.length > 0) {
-                    const port = ports[0];
-
-                    port.onconnect = () => {
-                        // port.setSignals({ dataTerminalReady: true, requestToSend: false });
-                        console.log("hi");
-                    };
-
-                    await port.open({ baudRate: 921000 });
-                    await port.setSignals({ dataTerminalReady: true, requestToSend: false });
-
-                    //   const reader = port.readable.getReader();
-
-                    while (port.readable) {
-                        const textDecoder = new TextDecoderStream();
-                        const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
-                        const reader = textDecoder.readable.getReader();
-
-                        // let dataIn = "";
-                        let state = 0;
-                        let currentNumString = "";
-
-                        try {
-                            while (true) {
-                                const { value, done } = await reader.read();
-                                if (done) {
-                                    // Allow the serial port to be closed later.
-                                    reader.releaseLock();
-                                    break;
-                                }
-                                if (value) {
-                                    // dataIn += value;
-                                    // console.log(dataIn);
-
-                                    for (const c of value) {
-                                        switch (state) {
-                                            case 0:
-                                                if (c === "$") {
-                                                    state = 1;
-                                                }
-                                                break;
-                                            case 1:
-                                                if (c !== " ") {
-                                                    currentNumString += c;
-                                                    // console.log(currentNumString);
-                                                } else {
-                                                    data.push({ x: j, y: Number.parseFloat(currentNumString) });
-                                                    currentNumString = "";
-                                                    state = 2;
-                                                }
-                                                break;
-                                            case 2:
-                                                if (c !== ";") {
-                                                    currentNumString += c;
-                                                } else {
-                                                    data2.push({ x: j, y: Number.parseFloat(currentNumString) });
-                                                    currentNumString = "";
-                                                    state = 0;
-                                                    chart.update();
-                                                    j++;
-                                                }
-                                                break;
-                                            default:
-                                                throw Error("Invalid state: " + state);
-                                        }
-                                    }
-                                }
-                            }
-                        } catch (error) {
-                            console.error(error);
-                        }
-                    }
+            async function disconnectPort() {
+                if (!connectedPort) return;
+                if (currentReader) {
+                    await currentReader.cancel();
+                    currentReader = null;
                 }
-            });
+            }
 
-            document.getElementById("btnSelect").addEventListener("click", async () => {
-                // Prompt user to select any serial port.
+            async function selectPort() {
                 const port = await navigator.serial.requestPort();
+                connectToPort(port);
+            }
 
+            async function connectToPort(port) {
                 await port.open({ baudRate: 921000 });
+                connectedPort = port;
                 await port.setSignals({ dataTerminalReady: true, requestToSend: false });
-                await port.setSignals({ dataTerminalReady: false, requestToSend: false });
 
-                //   const reader = port.readable.getReader();
+                btnConnect.innerText = "Disconnect";
+                btnConnect.onclick = () => disconnectPort();
+                btnConnect.classList.add("active");
 
-                while (port.readable) {
+                let readableStreamClosed;
+                let writableStreamClosed;
+
+                let reading = true;
+
+                while (port.readable && reading) {
                     const textDecoder = new TextDecoderStream();
-                    const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+                    readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
                     const reader = textDecoder.readable.getReader();
+                    currentReader = reader;
 
-                    // let dataIn = "";
+                    const textEncoder = new TextEncoderStream();
+                    writableStreamClosed = textEncoder.readable.pipeTo(connectedPort.writable);
+                    currentWriter = textEncoder.writable.getWriter();
+
+                    setGain(128);
+                    setIntegrationTime(1);
+
                     let state = 0;
                     let currentNumString = "";
 
@@ -230,14 +338,10 @@
                         while (true) {
                             const { value, done } = await reader.read();
                             if (done) {
-                                // Allow the serial port to be closed later.
-                                reader.releaseLock();
+                                reading = false;
                                 break;
                             }
                             if (value) {
-                                // dataIn += value;
-                                // console.log(dataIn);
-
                                 for (const c of value) {
                                     switch (state) {
                                         case 0:
@@ -248,7 +352,6 @@
                                         case 1:
                                             if (c !== " ") {
                                                 currentNumString += c;
-                                                // console.log(currentNumString);
                                             } else {
                                                 data.push({ x: j, y: Number.parseFloat(currentNumString) });
                                                 currentNumString = "";
@@ -273,10 +376,29 @@
                             }
                         }
                     } catch (error) {
-                        console.error(error);
+                        console.error("PJB " + error);
                     }
                 }
+
+                currentReader.releaseLock();
+                await readableStreamClosed.catch(() => {});
+
+                currentWriter.close();
+                await writableStreamClosed;
+
+                await port.close();
+                btnConnect.innerText = "Select device";
+                btnConnect.onclick = selectPort;
+                btnConnect.classList.remove("active");
+            }
+
+            navigator.serial.getPorts().then(async (ports) => {
+                if (ports.length > 0) {
+                    connectToPort(ports[0]);
+                }
             });
+
+            btnConnect.onclick = selectPort;
         </script>
     </body>
 </html>
