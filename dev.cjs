@@ -29,7 +29,7 @@ watchDir(".", file => {
     console.log(file + " changed");
     if (file === ".\\main.ts") {
         const compiledSource = compileTSFile(file);
-        fs.writeFileSync(path.dirname(file) + "/deploy/main.js", compiledSource, { encoding: 'utf-8' });
+        fs.writeFileSync(path.dirname(file) + "/docs/main.js", compiledSource, { encoding: 'utf-8' });
     }
 });
 
