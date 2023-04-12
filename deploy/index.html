@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>OD</title>
+        <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> -->
+        <!-- <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script> -->
+        <!-- <script src="https://www.npmjs.com/package/chartjs-plugin-zoom/file/503c709802be285c676afe0369bf5f72066d0b0c23929188c3158f35c0327a9c"></script> -->
+        <style>
+            html,
+            body {
+                padding: 0;
+                margin: 0;
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+                user-select: none;
+            }
+
+            .btn {
+                background-color: white;
+                color: #555;
+                padding: 8px;
+                padding-left: 12px;
+                padding-right: 12px;
+                border-radius: 999px;
+                cursor: pointer;
+                max-width: fit-content;
+                font-weight: bold;
+                text-transform: capitalize;
+                transition: all 0.2s ease-in-out;
+                border: 1px solid #ddd;
+            }
+            .btn:hover {
+                background-color: #eee;
+            }
+
+            .active {
+                background-color: #32de84;
+                color: white;
+            }
+            .active:hover {
+                background-color: #1cac78 !important;
+            }
+
+            .dropdown {
+                align-self: flex-end;
+                text-align: end;
+                position: absolute;
+                margin-top: 4px;
+                border-radius: 10px;
+                border: 1px solid #ddd;
+                /* padding: 6px 12px 6px 12px; */
+                /* margin-left: auto; */
+                overflow: hidden;
+                right: 0;
+                background-color: white;
+                font-weight: bold;
+                text-transform: capitalize;
+                color: #555;
+                cursor: pointer;
+            }
+
+            .dropdownEntry {
+                padding: 6px 12px 6px 12px;
+            }
+            .dropdownEntry:hover {
+                background-color: #eee;
+            }
+
+            .slider {
+                background-color: white;
+                color: #555;
+                padding: 8px;
+                padding-left: 12px;
+                padding-right: 12px;
+                border-radius: 999px;
+                cursor: pointer;
+                max-width: fit-content;
+                font-weight: bold;
+                text-transform: capitalize;
+                transition: all 0.2s ease-in-out;
+                border: 1px solid #ddd;
+            }
+        </style>
+    </head>
+    <body style="max-height: 100vh; height: 100vh; display: flex; flex-direction: column">
+        <div id="header" style="flex: 0; padding: 10px; display: flex; flex-direction: row; gap: 5px">
+            <div id="btnSelect" class="btn">Select device</div>
+            <div id="btnExport" class="btn">Export data to CSV</div>
+            <div id="btnClear" class="btn">Clear data</div>
+            <div id="btnZero" class="btn">Zero sensor</div>
+            <div id="ddGain" style="position: relative">
+                <div class="btn">
+                    <p id="ddGainValue" style="display: inline"></p>
+                    gain
+                    <p style="display: inline; padding-left: 5px">&#9660;</p>
+                </div>
+                <div class="dropdown" style="display: none">
+                    <div class="dropdownEntry" gain="1">1X</div>
+                    <div class="dropdownEntry" gain="4">4X</div>
+                    <div class="dropdownEntry" gain="16">16X</div>
+                    <div class="dropdownEntry" gain="64">64X</div>
+                    <div class="dropdownEntry" gain="128">128X</div>
+                </div>
+            </div>
+            <div id="ddIntTime" style="position: relative">
+                <div class="btn">
+                    <p id="ddIntTimeValue" style="display: inline"></p>
+                    integration time
+                    <p style="display: inline; padding-left: 5px">&#9660;</p>
+                </div>
+                <div class="dropdown" style="display: none"></div>
+            </div>
+            <div id="sliderFreqBase" style="position: relative; border-radius: 999px; overflow: hidden; cursor: pointer">
+                <div id="sliderFreq" style="z-index: 0; position: absolute; border-radius: 999px; background-color: #32de84; width: 53%; height: 100%; transition: transform 0.2s ease-in-out"></div>
+                <div class="slider" style="display: flex; flex-direction: row; gap: 16px; color: #555">
+                    <div id="sliderFreq600" style="z-index: 1000">600nm</div>
+                    <div id="sliderFreq850" style="z-index: 1000">850nm</div>
+                </div>
+            </div>
+        </div>
+        <div style="flex: 1">
+            <canvas id="myChart" style="max-height: 100%"></canvas>
+        </div>
+        <script src="main.js"></script>
+    </body>
+</html>

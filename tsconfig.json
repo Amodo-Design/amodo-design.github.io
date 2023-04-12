@@ -1,0 +1,19 @@
+{
+    "compileOnSave": false,
+    "compilerOptions": {
+        "baseUrl": "src",
+        "downlevelIteration": true,
+        "importHelpers": true,
+        "module": "es2020",
+        "declaration": false,
+        "moduleResolution": "node",
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true,
+        "noImplicitAny": true,
+        "strict": false,
+        "noEmit": true,
+        "target": "ESNext",
+        "lib": ["es2017", "dom", "ES2021.String"],
+        "types": ["@types/wicg-file-system-access", "@types/dom-serial"]
+    }
+}
