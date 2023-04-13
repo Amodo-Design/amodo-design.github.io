@@ -6,6 +6,7 @@
     "@types/dom-serial": "^1.0.3",
     "@types/wicg-file-system-access": "^2020.9.6",
     "chart.js": "^4.2.1",
-    "chartjs-plugin-zoom": "^2.0.1"
+    "chartjs-plugin-zoom": "^2.0.1",
+    "notyf": "^3.10.0"
   }
 }

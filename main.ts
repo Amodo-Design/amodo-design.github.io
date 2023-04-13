@@ -1,6 +1,9 @@
+import { Notyf } from "notyf";
 import Chart from "chart.js/auto";
 import zoomPlugin from "chartjs-plugin-zoom";
 Chart.register(zoomPlugin);
+
+const notyf = new Notyf({ duration: 5000, dismissible: true });
 
 if (!("serial" in navigator)) {
     alert("Your browser does not support serial!");
@@ -53,12 +56,6 @@ function setWavelength(ir: boolean) {
     }
 }
 
-// for (let a = 0; a < 30000; a++) {
-//     data.push({ x: a, y: Math.random() });
-//     data2.push({ x: a, y: Math.random() });
-//     j++;
-// }
-
 e("sliderFreqBase").addEventListener("click", () => {
     if (e("sliderFreq").style.transform === "") {
         setWavelength(true);
@@ -72,34 +69,42 @@ document.getElementById("btnZero").addEventListener("click", async () => {
 });
 
 document.getElementById("btnExport").addEventListener("click", async () => {
-    const newHandle = await window.showSaveFilePicker({
-        suggestedName: "data.csv",
-        types: [
-            {
-                description: "CSV (Comma delimited)",
-                accept: { "text/csv": [".csv"] },
-            },
-        ],
-    });
+    try {
+        try {
+            var newHandle = await window.showSaveFilePicker({
+                suggestedName: "data.csv",
+                types: [
+                    {
+                        description: "CSV (Comma delimited)",
+                        accept: { "text/csv": [".csv"] },
+                    },
+                ],
+            });
+        } catch (e) {
+            if (e.message.includes("The user aborted a request")) return;
+            throw e;
+        }
 
-    // create a FileSystemWritableFileStream to write to
-    const writableStream = await newHandle.createWritable();
-    await writableStream.write("Raw,OD,Gain,Integration time (ms),Wavelength (nm)\n");
+        const writableStream = await newHandle.createWritable();
+        await writableStream.write("Raw,OD x1000,Gain,Integration time (ms),Wavelength (nm)\n");
 
-    window.onbeforeunload = () => {
-        writableStream.close();
-    };
+        window.onbeforeunload = () => {
+            writableStream.close();
+        };
 
-    let streamString = "";
-    for (let i = 0; i < data.raw.length; i++) {
-        streamString += data.raw[i].y + "," + data.od[i].y + "," + data.gain[i].y + "," + data.intTime[i].y + "," + data.wavelength[i].y + "\n";
+        let streamString = "";
+        for (let i = 0; i < data.raw.length; i++) {
+            streamString += data.raw[i].y + "," + data.od[i].y + "," + data.gain[i].y + "," + data.intTime[i].y + "," + data.wavelength[i].y + "\n";
+        }
+        await writableStream.write(streamString);
+
+        await writableStream.close();
+        notyf.success("CSV exported successfully!");
+    } catch (e) {
+        notyf.error("Failed to export CSV!");
+    } finally {
+        window.onbeforeunload = null;
     }
-    await writableStream.write(streamString);
-
-    console.log("Write finished");
-    await writableStream.close();
-
-    window.onbeforeunload = null;
 });
 
 document.querySelector("#ddGain .btn").addEventListener("click", () => {
@@ -135,7 +140,6 @@ document.querySelectorAll("#ddIntTime .dropdownEntry").forEach((e) => {
 const chart = new Chart(<HTMLCanvasElement>document.getElementById("myChart"), {
     type: "line",
     data: {
-        labels: ["Raw", "OD"],
         datasets: [
             {
                 borderWidth: 1,
@@ -147,7 +151,7 @@ const chart = new Chart(<HTMLCanvasElement>document.getElementById("myChart"), {
                 borderWidth: 1,
                 pointRadius: 0,
                 data: data.od,
-                label: "OD",
+                label: "OD x1000",
             },
         ],
     },
@@ -179,8 +183,6 @@ const chart = new Chart(<HTMLCanvasElement>document.getElementById("myChart"), {
             },
         },
         plugins: {
-            // legend: false,
-            // tooltip: false,
             decimation: {
                 enabled: true,
                 algorithm: "min-max",
@@ -244,7 +246,9 @@ async function disconnectPort() {
 
 async function selectPort() {
     const port = await navigator.serial.requestPort();
-    connectToPort(port);
+    if (port) {
+        connectToPort(port);
+    }
 }
 
 async function connectToPort(port: SerialPort) {
@@ -259,6 +263,10 @@ async function connectToPort(port: SerialPort) {
     let readableStreamClosed;
     let writableStreamClosed;
 
+    const textEncoder = new TextEncoderStream();
+    writableStreamClosed = textEncoder.readable.pipeTo(connectedPort.writable);
+    currentWriter = textEncoder.writable.getWriter();
+
     let reading = true;
 
     while (port.readable && reading) {
@@ -266,10 +274,6 @@ async function connectToPort(port: SerialPort) {
         readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
         const reader = textDecoder.readable.getReader();
         currentReader = reader;
-
-        const textEncoder = new TextEncoderStream();
-        writableStreamClosed = textEncoder.readable.pipeTo(connectedPort.writable);
-        currentWriter = textEncoder.writable.getWriter();
 
         setGain("128");
         setIntegrationTime(1);
@@ -323,20 +327,25 @@ async function connectToPort(port: SerialPort) {
                 }
             }
         } catch (error) {
-            console.error("PJB " + error);
+            console.error(error);
         }
     }
 
-    currentReader.releaseLock();
-    await readableStreamClosed.catch(() => {});
+    try {
+        await currentReader.cancel();
+        currentReader.releaseLock();
+        await readableStreamClosed.catch(() => {});
 
-    currentWriter.close();
-    await writableStreamClosed;
+        await currentWriter.close();
+        currentWriter.releaseLock();
+        await writableStreamClosed;
 
-    await port.close();
-    btnConnect.innerText = "Select device";
-    btnConnect.onclick = selectPort;
-    btnConnect.classList.remove("active");
+        await port.close();
+    } finally {
+        btnConnect.innerText = "Select device";
+        btnConnect.onclick = selectPort;
+        btnConnect.classList.remove("active");
+    }
 }
 
 navigator.serial.getPorts().then(async (ports) => {

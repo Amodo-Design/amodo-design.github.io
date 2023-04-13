@@ -8,7 +8,7 @@ const MIN_WATCH_TIMEOUT_MS = 50;
 
 function compileTSFile(tsFilePath) {
     const outFile = os.tmpdir() + path.sep + crypto.randomUUID() + ".tmp";
-    esbuild.buildSync({ entryPoints: [tsFilePath], minify: false, bundle: true, outfile: outFile });
+    esbuild.buildSync({ entryPoints: [tsFilePath], minify: true, bundle: true, outfile: outFile });
     const jsCode = fs.readFileSync(outFile, { encoding: "utf-8" });
     fs.rmSync(outFile);
     return jsCode;
