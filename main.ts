@@ -13,15 +13,27 @@ if (!("serial" in navigator)) {
 function e(id: string) {
     return document.getElementById(id);
 }
+function oc(id: string, callback: (e: HTMLElement) => () => void) {
+    document.getElementById(id).addEventListener("click", callback(document.getElementById(id)));
+}
+function oe(id: string, callback: (e: HTMLElement) => () => void) {
+    const c = callback(document.getElementById(id));
+    document.getElementById(id).addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") {
+            c();
+        }
+    });
+}
 
 type Dataset = { x: number; y: number }[];
-const data: { index: number; raw: Dataset; od: Dataset; gain: Dataset; intTime: Dataset; wavelength: Dataset } = {
+const data: { index: number; raw: Dataset; od: Dataset; gain: Dataset; intTime: Dataset; wavelength: Dataset; note: { x: number; y: string }[] } = {
     index: 0,
     raw: [],
     od: [],
     intTime: [],
     wavelength: [],
     gain: [],
+    note: [],
 };
 
 let connectedPort: SerialPort = null;
@@ -32,6 +44,7 @@ const btnConnect = document.getElementById("btnSelect");
 let thisGain: number = 0;
 let thisWavelength: number = 0;
 let thisIntTime: number = 0;
+let note: string = "";
 
 function setGain(gain: string) {
     thisGain = Number.parseInt(gain);
@@ -86,7 +99,7 @@ document.getElementById("btnExport").addEventListener("click", async () => {
         }
 
         const writableStream = await newHandle.createWritable();
-        await writableStream.write("Raw,OD x1000,Gain,Integration time (ms),Wavelength (nm)\n");
+        await writableStream.write("Raw,OD x1000,Gain,Integration time (ms),Wavelength (nm),Note\n");
 
         window.onbeforeunload = () => {
             writableStream.close();
@@ -94,7 +107,7 @@ document.getElementById("btnExport").addEventListener("click", async () => {
 
         let streamString = "";
         for (let i = 0; i < data.raw.length; i++) {
-            streamString += data.raw[i].y + "," + data.od[i].y + "," + data.gain[i].y + "," + data.intTime[i].y + "," + data.wavelength[i].y + "\n";
+            streamString += data.raw[i].y + "," + data.od[i].y + "," + data.gain[i].y + "," + data.intTime[i].y + "," + data.wavelength[i].y + "," + data.note[i].y + "\n";
         }
         await writableStream.write(streamString);
 
@@ -135,6 +148,36 @@ document.querySelectorAll("#ddIntTime .dropdownEntry").forEach((e) => {
         (<HTMLElement>document.querySelector("#ddIntTime .dropdown")).style.display = "none";
         setIntegrationTime(Number.parseInt(e.getAttribute("time")));
     });
+});
+
+let integrationIteratorTimeout: number = null;
+oc("btnScanIntegrationTimes", (e) => () => {
+    if (e.classList.toggle("active")) {
+        let i = 0;
+        setIntegrationTime(0);
+        setTimeout(() => {
+            const t = () =>
+                setTimeout(() => {
+                    setIntegrationTime(++i);
+                    if (i >= 11) {
+                        e.classList.remove("active");
+                    } else {
+                        integrationIteratorTimeout = t();
+                    }
+                }, (5 * ((i * 25 + 5) * 2.78)) >> 0);
+            integrationIteratorTimeout = t();
+        }, 1000);
+    } else {
+        clearTimeout(integrationIteratorTimeout);
+    }
+});
+
+oe("noteInput", (e: HTMLInputElement) => () => {
+    document.getElementById("noteCheck").style.fill = "#32de84";
+    note = e.value;
+});
+document.getElementById("noteInput").addEventListener("input", () => {
+    document.getElementById("noteCheck").style.fill = "none";
 });
 
 const chart = new Chart(<HTMLCanvasElement>document.getElementById("myChart"), {
@@ -314,6 +357,7 @@ async function connectToPort(port: SerialPort) {
                                     data.gain.push({ x: data.index, y: thisGain });
                                     data.intTime.push({ x: data.index, y: thisIntTime });
                                     data.wavelength.push({ x: data.index, y: thisWavelength });
+                                    data.note.push({ x: data.index, y: note });
                                     currentNumString = "";
                                     state = 0;
                                     data.index++;

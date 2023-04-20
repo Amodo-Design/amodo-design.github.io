@@ -6,11 +6,17 @@
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.css" />
         <style>
             html,
+            input,
             body {
                 padding: 0;
                 margin: 0;
                 font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+                font-size: 16px;
                 user-select: none;
+            }
+
+            input::placeholder {
+                color: #ddd;
             }
 
             .btn {
@@ -78,6 +84,31 @@
                 transition: all 0.2s ease-in-out;
                 border: 1px solid #ddd;
             }
+
+            .border {
+                border: 1px solid #ddd;
+                border-radius: 999px;
+            }
+
+            .border:has(input:focus) {
+                /* border-color: blue; */
+                outline: 1.5px solid #ddd;
+            }
+
+            .note {
+                background-color: transparent;
+                color: #555;
+                padding: 8px;
+                padding-left: 12px;
+                padding-right: 12px;
+                cursor: pointer;
+                max-width: fit-content;
+                font-weight: bold;
+                text-transform: capitalize;
+                transition: all 0.2s ease-in-out;
+                border: none;
+                outline: none;
+            }
         </style>
     </head>
     <body style="max-height: 100vh; height: 100vh; display: flex; flex-direction: column">
@@ -113,6 +144,15 @@
                 <div class="slider" style="display: flex; flex-direction: row; gap: 16px; color: #555">
                     <div id="sliderFreq600" style="z-index: 1000">600nm</div>
                     <div id="sliderFreq850" style="z-index: 1000">850nm</div>
+                </div>
+            </div>
+            <div id="btnScanIntegrationTimes" class="btn">Scan integration times</div>
+            <div class="border" style="display: flex; overflow: hidden">
+                <input id="noteInput" type="text" placeholder="note" class="note" />
+                <div style="width: 40px; height: 100%; display: flex; align-items: center; justify-content: center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="width: 26px; height: 26px; margin-top: -1px">
+                        <path id="noteCheck" d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM369 209c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0l-111 111-47-47c-9.4-9.4-24.6-9.4-33.9 0s-9.4 24.6 0 33.9l64 64c9.4 9.4 24.6 9.4 33.9 0L369 209z" style="fill: none" />
+                    </svg>
                 </div>
             </div>
         </div>
